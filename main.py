@@ -96,7 +96,8 @@ def check_subscription_callback(update: Update, context: CallbackContext):
 updater = Updater(token=TOKEN, use_context=True)
 dp = updater.dispatcher
 
-dp.add_handler(MessageHandler(Filters.chat(DATABASE_CHANNEL) & (Filters.video | Filters.document), save_file))
+# اصلاح فیلترها به صورت صحیح
+dp.add_handler(MessageHandler(filters.Chat(DATABASE_CHANNEL) & (filters.Video | filters.Document), save_file))
 dp.add_handler(CommandHandler("start", start))
 dp.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="check_.*"))
 

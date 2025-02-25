@@ -1,6 +1,6 @@
 import sqlite3
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, CallbackContext
 from telegram.error import BadRequest
 
 TOKEN = "8152621696:AAHeP8gA3q7VoFr4kgPOySgCh-DADyr57GY"
@@ -48,7 +48,7 @@ def save_file(update: Update, context: CallbackContext):
         message.reply_text(f"✅ فایل ذخیره شد!\n🔗 لینک دریافت: {file_link}")
 
 # پردازش /start و بررسی آی‌دی فایل
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: CallbackContext):
     user_id = update.message.chat_id
     args = context.args
 
@@ -60,7 +60,7 @@ def start(update: Update, context: CallbackContext):
             keyboard = [[InlineKeyboardButton("📢 عضویت در کانال", url=f"https://t.me/{LOCKED_CHANNEL}")],
                         [InlineKeyboardButton("✅ بررسی عضویت", callback_data=f"check_{file_unique_id}")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            update.message.reply_text("🚨 برای دریافت فایل، ابتدا در کانال زیر عضو شوید:", reply_markup=reply_markup)
+            await update.message.reply_text("🚨 برای دریافت فایل، ابتدا در کانال زیر عضو شوید:", reply_markup=reply_markup)
             return
 
         # جستجوی فایل در دیتابیس
@@ -68,14 +68,14 @@ def start(update: Update, context: CallbackContext):
         file = cursor.fetchone()
 
         if file:
-            bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
+            await bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
         else:
-            update.message.reply_text("❌ فایل موردنظر یافت نشد!")
+            await update.message.reply_text("❌ فایل موردنظر یافت نشد!")
     else:
-        update.message.reply_text("سلام! برای دریافت فایل، لینک مخصوص آن را کلیک کنید.")
+        await update.message.reply_text("سلام! برای دریافت فایل، لینک مخصوص آن را کلیک کنید.")
 
 # بررسی مجدد عضویت و ارسال فایل
-def check_subscription_callback(update: Update, context: CallbackContext):
+async def check_subscription_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
     file_unique_id = query.data.split("_")[1]
@@ -85,21 +85,23 @@ def check_subscription_callback(update: Update, context: CallbackContext):
         file = cursor.fetchone()
         
         if file:
-            bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
-            query.message.delete()
+            await bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
+            await query.message.delete()
         else:
-            query.message.edit_text("❌ فایل موردنظر یافت نشد!")
+            await query.message.edit_text("❌ فایل موردنظر یافت نشد!")
     else:
-        query.answer("⛔️ هنوز عضو کانال نشده‌اید!")
+        await query.answer("⛔️ هنوز عضو کانال نشده‌اید!")
 
-# راه‌اندازی ربات
-updater = Updater(token=TOKEN, use_context=True)
-dp = updater.dispatcher
+# راه‌اندازی ربات با Application
+async def main():
+    application = Application.builder().token(TOKEN).build()
 
-# اصلاح فیلترها به صورت صحیح
-dp.add_handler(MessageHandler(filters.Chat(DATABASE_CHANNEL) & (filters.Video | filters.Document), save_file))
-dp.add_handler(CommandHandler("start", start))
-dp.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="check_.*"))
+    application.add_handler(MessageHandler(filters.Chat(DATABASE_CHANNEL) & (filters.Video | filters.Document), save_file))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="check_.*"))
 
-updater.start_polling()
-updater.idle()
+    await application.run_polling()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

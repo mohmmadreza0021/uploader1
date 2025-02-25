@@ -1,50 +1,104 @@
-<?php
+import sqlite3
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
+from telegram.error import BadRequest
 
-     /*
-     @TGsoldierSources
-     @oYSoF
-     */
+TOKEN = "YOUR_BOT_TOKEN"
+DATABASE_CHANNEL = "@my_database_channel"  # کانال دیتابیس
+LOCKED_CHANNEL = "@locked_channel"  # کانالی که جوین اجباری دارد
 
-     define('BOT_TOKEN','8152621696:AAHeP8gA3q7VoFr4kgPOySgCh-DADyr57GY');
-     $update = json_decode(file_get_contents('php://input'));
-     $chat_id = $update->message->chat->id;
-     $msg_id = $update->message->message_id;
-     $msg_text = $update->message->text;
-     $user_id = $update->message->from->id;
-     $name = $update->message->from->first_name;
-     $photo = $update->message->photo;
-     $audio = $update->message->audio;
-     $document = $update->message->document;
-     $sticker = $update->message->sticker;
-     $video = $update->message->video;
-     $voice = $update->message->voice;
-     if ($photo != null) {$count = count($photo)-1; $file_id = $photo[$count]->file_id;}
-     elseif ($audio != null) {$file_id = $audio->file_id;}
-     elseif ($document != null) {$file_id = $document->file_id;}
-     elseif ($sticker != null) {$file_id = $sticker->file_id;}
-     elseif ($video != null) {$file_id = $video->file_id;}
-     elseif ($voice != null) {$file_id = $voice->file_id;}
-     if ($file_id != null || $msg_text == '/start') {file_get_contents('https://api.telegram.org/bot'.BOT_TOKEN.'/sendChatAction?chat_id='.$chat_id.'&action=typing');}
-     $get_url = json_decode(file_get_contents('https://api.pwrtelegram.xyz/bot'.BOT_TOKEN.'/getFile?file_id='.$file_id));
-     $url = $get_url->result->file_path;
-     $error = $get_url->error_code;
-     $file_link = 'https://storage.pwrtelegram.xyz/'.$url;
-     function bot($method,$fields)
-     {$url = 'https://api.telegram.org/bot'.BOT_TOKEN.'/'.$method;
-     $ch = curl_init();
-     curl_setopt($ch, CURLOPT_URL, $url);
-     curl_setopt($ch, CURLOPT_POST, count($fields));
-     curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
-     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-     $answer = curl_exec($ch);
-     curl_close($ch);}
-     function sendMessage($chat_id,$text,$message_id)
-     {$fields = array('chat_id'=>$chat_id,'text'=>$text,'parse_mode'=>'html','reply_to_message_id'=>$message_id,'disable_web_page_preview'=>'true');
-     bot('sendMessage',$fields);}
-     if ($msg_text == '/start') {sendMessage($chat_id,"سلام 😉✋🏻\n\n💠با این ربات شما میتونید فایل های تلگرامی خودتون رو تا حجم 1.5 گیگابایت بدون کم شدن ترافیک آپلود کنید ! \n\n✅کافیه فایلهای خودتون رو به ربات بفرستید یا فوروارد کنید تا لینک دانلود مستقیم آن را دریافت کنید .");}
-     elseif ($url == null && $file_id != null || $error != null && $file_id != null)
-          {sendMessage($chat_id,"❗️خطا❗️\n\n🔻لطفا لحظاتی دیگر دوباره امتحان کنید🔻",$msg_id);}
-     elseif ($file_id != null && $error == null)
-          {$message = "لینک : ".$file_link;
-          sendMessage($chat_id,$message,$msg_id);}
-?>
+# اتصال به دیتابیس SQLite
+conn = sqlite3.connect("files.db", check_same_thread=False)
+cursor = conn.cursor()
+
+# ایجاد جدول ذخیره فایل‌ها (اگر وجود نداشت)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id TEXT NOT NULL,
+    unique_id TEXT NOT NULL
+)
+""")
+conn.commit()
+
+bot = Bot(token=TOKEN)
+
+# بررسی عضویت در کانال
+def check_subscription(user_id):
+    try:
+        chat_member = bot.get_chat_member(LOCKED_CHANNEL, user_id)
+        return chat_member.status in ["member", "administrator", "creator"]
+    except BadRequest:
+        return False
+
+# دریافت فایل از کانال و ذخیره در دیتابیس
+def save_file(update: Update, context: CallbackContext):
+    message = update.message
+    if message.video or message.document:
+        file = message.video or message.document
+        file_id = file.file_id
+        unique_id = file.file_unique_id  # آی‌دی یکتا برای هر فایل
+
+        # ذخیره در دیتابیس
+        cursor.execute("INSERT INTO files (file_id, unique_id) VALUES (?, ?)", (file_id, unique_id))
+        conn.commit()
+
+        # ارسال لینک دانلود برای ادمین
+        file_link = f"https://t.me/{bot.username}?start={unique_id}"
+        message.reply_text(f"✅ فایل ذخیره شد!\n🔗 لینک دریافت: {file_link}")
+
+# پردازش /start و بررسی آی‌دی فایل
+def start(update: Update, context: CallbackContext):
+    user_id = update.message.chat_id
+    args = context.args
+
+    if args:
+        file_unique_id = args[0]
+        
+        # بررسی عضویت کاربر
+        if not check_subscription(user_id):
+            keyboard = [[InlineKeyboardButton("📢 عضویت در کانال", url=f"https://t.me/{LOCKED_CHANNEL}")],
+                        [InlineKeyboardButton("✅ بررسی عضویت", callback_data=f"check_{file_unique_id}")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text("🚨 برای دریافت فایل، ابتدا در کانال زیر عضو شوید:", reply_markup=reply_markup)
+            return
+
+        # جستجوی فایل در دیتابیس
+        cursor.execute("SELECT file_id FROM files WHERE unique_id=?", (file_unique_id,))
+        file = cursor.fetchone()
+
+        if file:
+            bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
+        else:
+            update.message.reply_text("❌ فایل موردنظر یافت نشد!")
+    else:
+        update.message.reply_text("سلام! برای دریافت فایل، لینک مخصوص آن را کلیک کنید.")
+
+# بررسی مجدد عضویت و ارسال فایل
+def check_subscription_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    file_unique_id = query.data.split("_")[1]
+
+    if check_subscription(user_id):
+        cursor.execute("SELECT file_id FROM files WHERE unique_id=?", (file_unique_id,))
+        file = cursor.fetchone()
+        
+        if file:
+            bot.send_document(user_id, file[0], caption="🎬 فایل شما آماده است!")
+            query.message.delete()
+        else:
+            query.message.edit_text("❌ فایل موردنظر یافت نشد!")
+    else:
+        query.answer("⛔️ هنوز عضو کانال نشده‌اید!")
+
+# راه‌اندازی ربات
+updater = Updater(token=TOKEN, use_context=True)
+dp = updater.dispatcher
+
+dp.add_handler(MessageHandler(Filters.chat(DATABASE_CHANNEL) & (Filters.video | Filters.document), save_file))
+dp.add_handler(CommandHandler("start", start))
+dp.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="check_.*"))
+
+updater.start_polling()
+updater.idle()

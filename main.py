@@ -3,9 +3,9 @@ from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 from telegram.error import BadRequest
 
-TOKEN = "YOUR_BOT_TOKEN"
-DATABASE_CHANNEL = "@my_database_channel"  # کانال دیتابیس
-LOCKED_CHANNEL = "@locked_channel"  # کانالی که جوین اجباری دارد
+TOKEN = "8152621696:AAHeP8gA3q7VoFr4kgPOySgCh-DADyr57GY"
+DATABASE_CHANNEL = "1002381931065"  # کانال دیتابیس
+LOCKED_CHANNEL = "@v_hichi"  # کانالی که جوین اجباری دارد
 
 # اتصال به دیتابیس SQLite
 conn = sqlite3.connect("files.db", check_same_thread=False)

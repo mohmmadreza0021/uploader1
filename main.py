@@ -1,6 +1,6 @@
 import sqlite3
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackQueryHandler, CallbackContext
 from telegram.error import BadRequest
 
 TOKEN = "8152621696:AAHeP8gA3q7VoFr4kgPOySgCh-DADyr57GY"

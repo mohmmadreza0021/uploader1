@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # دریافت توکن ربات از متغیر محیطی
-TOKEN = os.getenv('TELEGRAM_TOKEN')
+TOKEN = os.getenv('8152621696:AAHeP8gA3q7VoFr4kgPOySgCh-DADyr57GY')
 
 # دیکشنری برای ذخیره فایل‌های ارسال شده
 file_ids = {}
